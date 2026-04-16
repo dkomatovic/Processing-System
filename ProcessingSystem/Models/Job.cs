@@ -10,12 +10,14 @@ namespace ProcessingSystem.Models
         public int Priority { get; set; }
         public int Attempts { get; set; }
         public JobStatus Status { get; set; }
+        public double Duration { get; set; }
 
         public Job()
         {
             Id = Guid.NewGuid();
             Attempts = 0;
             Status = JobStatus.Pending;
+            Duration = 0;
         }
 
         public override string ToString()
