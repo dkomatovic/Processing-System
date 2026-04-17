@@ -133,48 +133,49 @@ namespace ProcessingSystem
         }
         static async Task Main(string[] args)
         {
-            string logFilePath = "events.log";
-            var config = ConfigParser.parseConfig("C:\\Users\\hp\\Downloads\\SystemConfig\\SystemConfig.xml");
+            string logFilePath = "C:\\Users\\hp\\Desktop\\events.log";
+            string configFilePath = "C:\\Users\\hp\\Downloads\\SystemConfig\\SystemConfig.xml";
+            string reportsDirPath = "C:\\Users\\hp\\Desktop\\reports";
+
+            
+            object logLock = new object();
+            var config = ConfigParser.parseConfig(configFilePath);
             if (config == null) return;
 
-            var system = new ProcessingSystem.Services.ProcessingSystem(config.WorkerCount, config.MaxQueueSize);
+            var system = new ProcessingSystem.Services.ProcessingSystem(
+                config.WorkerCount,
+                config.MaxQueueSize,
+                reportsDirPath);
 
             system.OnJobCompleted += async (DateTime dateTime, Guid jobId, int result) =>
             {
-                try
+                lock (logLock)
                 {
                     string logLine = $"[{dateTime}] [COMPLETED] JobId: {jobId}, Result: {result}";
-                    await File.AppendAllTextAsync(logFilePath, logLine + Environment.NewLine);
-                } catch (Exception e)
-                {
-                    Console.WriteLine($"Failed to log completed {jobId}");
+                    Console.WriteLine(logLine);
+                    File.AppendAllText(logFilePath, logLine + Environment.NewLine);
                 }
             };
 
-            system.OnJobFailed += async (DateTime dateTime, Guid jobId) =>
+            system.OnJobFailed += async (DateTime dateTime, Guid jobId, string message) =>
             {
-                try
+                lock (logLock)
                 {
-                    string logLine = $"[{dateTime}] [FAILED] JobId: {jobId}";
-                    await File.AppendAllTextAsync(logFilePath, logLine + Environment.NewLine);
-                } catch (Exception e)
-                {
-                    Console.WriteLine($"Failed to log failed {jobId}");
+                    string logLine = $"[{dateTime}] [{message}] JobId: {jobId}";
+                    Console.WriteLine(logLine);
+                    File.AppendAllText(logFilePath, logLine + Environment.NewLine);
                 }
             };
 
-            /* Main logic with the system */
+            foreach (Job job in config.Jobs)
+            {
+                system.Submit(job);
+            }
 
-            //system.TestEvents();
-            //system.TestEvents();
+            Console.WriteLine("Press enter to exit app...");
+            Console.ReadLine();
 
-            string content = File.ReadAllText("events.log");
-            Console.WriteLine(content);
-
-            ReportGenerator generator = new ReportGenerator("C:\\Users\\hp\\Desktop\\reports");
-            generator.WriteTestReport(GetTestJobsWithVariousStatuses());
-
-
+            await system.ShutdownAsync();
 
         }
 

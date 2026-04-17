@@ -7,10 +7,22 @@ namespace ProcessingSystem.Services
     public class ReportGenerator
     {
         private readonly string _directoryPath;
+        private List<string> _reportFilePaths = new List<string>();
 
         public ReportGenerator(string directoryPath)
         {
             _directoryPath = directoryPath;
+
+            if (!Directory.Exists(_directoryPath))
+            {
+                Directory.CreateDirectory(_directoryPath);
+                Console.WriteLine($"Created reports directory at: {_directoryPath}");
+                return;
+            }
+
+            string[] filePaths = Directory.GetFiles(_directoryPath, "report_*.xml");
+            _reportFilePaths.AddRange(filePaths);
+
         }
 
         private IEnumerable<object> GetCountByType(List<Job> allJobs)
@@ -127,8 +139,18 @@ namespace ProcessingSystem.Services
             }
         }
 
-        public void WriteTestReport(List<Job> allJobs)
+        public void CreateReportFile(List<Job> allJobs)
         {
+            if (_reportFilePaths.Count >= 10)
+            {
+                string oldestReportFilePath = _reportFilePaths
+                    .OrderBy(filePath => Path.GetFileNameWithoutExtension(filePath))
+                    .First();
+
+                File.Delete(oldestReportFilePath);
+                _reportFilePaths.Remove(oldestReportFilePath);
+            }
+
             XmlDocument doc = new XmlDocument();
 
             XmlElement root = doc.CreateElement("Reports");
@@ -136,7 +158,8 @@ namespace ProcessingSystem.Services
 
             GenerateReportXML(allJobs, doc, root);
 
-            string filePath = Path.Combine(_directoryPath, "test.xml");
+            string timestamp = DateTime.Now.ToString("yyyyMMddHHmmss");
+            string filePath = Path.Combine(_directoryPath, $"report_{timestamp}.xml");
 
             using (var writer = new XmlTextWriter(filePath, System.Text.Encoding.UTF8))
             {
@@ -146,6 +169,7 @@ namespace ProcessingSystem.Services
             }
 
             Console.WriteLine($"Report saved to: {filePath}");
+
         }
     }
 }
